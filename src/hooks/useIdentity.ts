@@ -1,0 +1,126 @@
+"use client";
+
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { keccak256, toBytes } from "viem";
+import { IDENTITY_SBT_ADDRESS } from "@/config/constants";
+import { IDENTITY_SBT_ABI } from "@/config/abi";
+
+export function useIdentity(address?: `0x${string}`) {
+  const { data: isVerified } = useReadContract({
+    address: IDENTITY_SBT_ADDRESS as `0x${string}`,
+    abi: IDENTITY_SBT_ABI,
+    functionName: "isVerified",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+
+  const { data: score } = useReadContract({
+    address: IDENTITY_SBT_ADDRESS as `0x${string}`,
+    abi: IDENTITY_SBT_ABI,
+    functionName: "getScore",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+
+  const { data: credentialKeys } = useReadContract({
+    address: IDENTITY_SBT_ADDRESS as `0x${string}`,
+    abi: IDENTITY_SBT_ABI,
+    functionName: "getCredentialKeys",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+
+  const { data: identity } = useReadContract({
+    address: IDENTITY_SBT_ADDRESS as `0x${string}`,
+    abi: IDENTITY_SBT_ABI,
+    functionName: "getIdentity",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address && !!isVerified },
+  });
+
+  return { isVerified: !!isVerified, score: Number(score || 0), credentialKeys: credentialKeys || [], identity };
+}
+
+export function useCreateIdentity() {
+  const { writeContract, data: hash, isPending } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  const create = (data: string) => {
+    const dataHash = keccak256(toBytes(data));
+    writeContract({
+      address: IDENTITY_SBT_ADDRESS as `0x${string}`,
+      abi: IDENTITY_SBT_ABI,
+      functionName: "createIdentity",
+      args: [dataHash],
+    });
+  };
+
+  return { create, isPending, isConfirming, isSuccess, hash };
+}
+
+export function useAddCredential() {
+  const { writeContract, data: hash, isPending } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  const addCredential = (type: string, data: string) => {
+    const credentialHash = keccak256(toBytes(data));
+    writeContract({
+      address: IDENTITY_SBT_ADDRESS as `0x${string}`,
+      abi: IDENTITY_SBT_ABI,
+      functionName: "addCredential",
+      args: [type, credentialHash],
+    });
+  };
+
+  return { addCredential, isPending, isConfirming, isSuccess, hash };
+}
+
+export function useUpdateCredential() {
+  const { writeContract, data: hash, isPending } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  const updateCredential = (type: string, data: string) => {
+    const credentialHash = keccak256(toBytes(data));
+    writeContract({
+      address: IDENTITY_SBT_ADDRESS as `0x${string}`,
+      abi: IDENTITY_SBT_ABI,
+      functionName: "updateCredential",
+      args: [type, credentialHash],
+    });
+  };
+
+  return { updateCredential, isPending, isConfirming, isSuccess, hash };
+}
+
+export function useSetSocial() {
+  const { writeContract, data: hash, isPending } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  const setSocial = (platform: string, handle: string) => {
+    const platformHash = keccak256(toBytes(platform));
+    const handleHash = keccak256(toBytes(handle));
+    writeContract({
+      address: IDENTITY_SBT_ADDRESS as `0x${string}`,
+      abi: IDENTITY_SBT_ABI,
+      functionName: "setSocial",
+      args: [platformHash, handleHash],
+    });
+  };
+
+  return { setSocial, isPending, isConfirming, isSuccess, hash };
+}
+
+export function useAddressByHandle(platform?: string, handle?: string) {
+  const platformHash = platform ? keccak256(toBytes(platform)) : undefined;
+  const handleHash = handle ? keccak256(toBytes(handle)) : undefined;
+
+  const { data } = useReadContract({
+    address: IDENTITY_SBT_ADDRESS as `0x${string}`,
+    abi: IDENTITY_SBT_ABI,
+    functionName: "getAddressByHandle",
+    args: platformHash && handleHash ? [platformHash, handleHash] : undefined,
+    query: { enabled: !!platformHash && !!handleHash },
+  });
+
+  return data as `0x${string}` | undefined;
+}
