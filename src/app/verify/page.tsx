@@ -142,7 +142,7 @@ export default function VerifyPage() {
       {step === "wallet" && (
         <div className="card space-y-4">
           <h2 className="text-xl font-semibold">Step 1: Prove Wallet Ownership</h2>
-          <p className="text-muted text-sm">Sign a message to prove you own this wallet. This creates your on-chain identity.</p>
+          <p className="text-muted text-sm">Sign a message to prove you own this wallet. This creates your on-chain identity. You will need to confirm 2-3 transactions in your wallet.</p>
           {walletSigned ? (
             <div className="flex items-center gap-2 text-green-400">
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
@@ -164,7 +164,7 @@ export default function VerifyPage() {
       {step === "personal" && (
         <div className="card space-y-4">
           <h2 className="text-xl font-semibold">Step 2: Personal Information</h2>
-          <p className="text-muted text-sm">Add personal details. Only hashes are stored on-chain - your data stays private.</p>
+          <p className="text-muted text-sm">Add personal details. Only hashes are stored on-chain - your data stays private. Each field requires a separate transaction.</p>
           <div className="space-y-3">
             <input
               type="text"
@@ -204,7 +204,7 @@ export default function VerifyPage() {
       {step === "social" && (
         <div className="card space-y-4">
           <h2 className="text-xl font-semibold">Step 3: Link Social Accounts</h2>
-          <p className="text-muted text-sm">Sign in with your social accounts to verify ownership and increase your Trust Score.</p>
+          <p className="text-muted text-sm">Sign in with your social accounts to verify ownership. Each account requires 2 transactions to confirm.</p>
           <div className="space-y-3">
             {linkedSocials.twitter ? (
               <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-green-500/30 bg-green-500/5">
@@ -253,7 +253,7 @@ export default function VerifyPage() {
       {step === "wallets" && (
         <div className="card space-y-4">
           <h2 className="text-xl font-semibold">Step 4: Link Other Wallets</h2>
-          <p className="text-muted text-sm">Add wallets from other chains to prove cross-chain presence.</p>
+          <p className="text-muted text-sm">Add wallets from other chains to prove cross-chain presence. Each wallet requires a separate transaction.</p>
           <div className="space-y-3">
             <div>
               <input
