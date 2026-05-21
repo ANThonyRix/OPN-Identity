@@ -126,8 +126,15 @@ export default function VerifyPage() {
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] px-4">
         <div className="card max-w-md w-full text-center space-y-4">
           <h2 className="text-2xl font-bold">Already Verified</h2>
-          <p className="text-muted">This wallet already has an on-chain identity. You can edit your credentials from the Dashboard.</p>
-          <a href="/dashboard" className="btn-primary inline-block">Go to Dashboard</a>
+          <p className="text-muted">This wallet already has an on-chain identity. You can add more credentials below or edit from the Dashboard.</p>
+          <div className="flex flex-col gap-3">
+            <button onClick={() => { setWalletSigned(true); setStep("personal"); }} className="btn-primary inline-block">
+              Add More Credentials
+            </button>
+            <a href="/dashboard" className="px-4 py-3 rounded-lg border border-card-border text-muted hover:text-foreground transition-colors inline-block">
+              Go to Dashboard
+            </a>
+          </div>
         </div>
       </div>
     );
