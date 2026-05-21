@@ -91,25 +91,20 @@ contract OPNIdentitySBT is ERC721 {
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         _requireOwned(tokenId);
         address tokenOwner = ownerOf(tokenId);
-        Identity memory id = _identities[tokenOwner];
 
-        string memory svg = _generateSVG(id.score, tokenOwner);
+        string memory svg = _generateSVG(tokenOwner);
 
         string memory json = string(abi.encodePacked(
             '{"name":"OPN Identity #', tokenId.toString(),
-            '","description":"Soulbound identity token on OPN Network. Trust Score: ', uint256(id.score).toString(),
-            '/100","image":"data:image/svg+xml;base64,', Base64.encode(bytes(svg)),
-            '","attributes":[{"trait_type":"Trust Score","value":', uint256(id.score).toString(),
-            '},{"trait_type":"Credentials","value":', _credentialKeys[tokenOwner].length.toString(),
-            '},{"trait_type":"Issued At","display_type":"date","value":', id.issuedAt.toString(),
+            '","description":"Soulbound identity token on OPN Network. View Trust Score at opnid.app","image":"data:image/svg+xml;base64,', Base64.encode(bytes(svg)),
+            '","attributes":[{"trait_type":"Verified","value":"Yes"},{"trait_type":"Issued At","display_type":"date","value":', _identities[tokenOwner].issuedAt.toString(),
             '}]}'
         ));
 
         return string(abi.encodePacked("data:application/json;base64,", Base64.encode(bytes(json))));
     }
 
-    function _generateSVG(uint8 score, address account) internal pure returns (string memory) {
-        string memory scoreStr = uint256(score).toString();
+    function _generateSVG(address account) internal pure returns (string memory) {
         string memory addrStr = Strings.toHexString(uint160(account), 20);
         string memory shortAddr = string(abi.encodePacked(
             _substring(addrStr, 0, 6), "...", _substring(addrStr, 38, 42)
@@ -118,11 +113,11 @@ contract OPNIdentitySBT is ERC721 {
         return string(abi.encodePacked(
             '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">',
             '<rect width="400" height="400" rx="20" fill="#0a0e1a"/>',
-            '<circle cx="200" cy="160" r="80" fill="none" stroke="#6c5ce7" stroke-width="8"/>',
-            '<text x="200" y="175" text-anchor="middle" font-size="48" font-weight="bold" fill="white">', scoreStr, '</text>',
-            '<text x="200" y="270" text-anchor="middle" font-size="16" fill="#a0a0a0">Trust Score</text>',
-            '<text x="200" y="310" text-anchor="middle" font-size="14" fill="#6c5ce7">OPN Identity SBT</text>',
-            '<text x="200" y="350" text-anchor="middle" font-size="12" font-family="monospace" fill="#666">', shortAddr, '</text>',
+            '<circle cx="200" cy="140" r="60" fill="none" stroke="#6c5ce7" stroke-width="6"/>',
+            '<path d="M180 140 l10 10 l20-20" fill="none" stroke="#22c55e" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>',
+            '<text x="200" y="240" text-anchor="middle" font-size="22" font-weight="bold" fill="white">OPN Identity</text>',
+            '<text x="200" y="275" text-anchor="middle" font-size="14" fill="#6c5ce7">Verified SBT</text>',
+            '<text x="200" y="330" text-anchor="middle" font-size="12" font-family="monospace" fill="#666">', shortAddr, '</text>',
             '</svg>'
         ));
     }
