@@ -120,6 +120,18 @@ export default function VerifyPage() {
     );
   }
 
+  if (isVerified && !walletSigned) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] px-4">
+        <div className="card max-w-md w-full text-center space-y-4">
+          <h2 className="text-2xl font-bold">Already Verified</h2>
+          <p className="text-muted">This wallet already has an on-chain identity. You can edit your credentials from the Dashboard.</p>
+          <a href="/dashboard" className="btn-primary inline-block">Go to Dashboard</a>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-12 space-y-8">
       <div className="text-center space-y-2">
