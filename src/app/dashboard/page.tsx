@@ -228,7 +228,7 @@ export default function DashboardPage() {
           )}
         </div>
         {isEditing && (
-          <p className="text-xs text-muted mb-3 -mt-2">Saving will send a transaction to update your credentials on-chain.</p>
+          <p className="text-xs text-muted mb-3 -mt-2">Each changed field requires a separate on-chain transaction. You will need to confirm as many transactions as fields you edit.</p>
         )}
         <div className="space-y-3">
           {(credentialKeys as string[]).length === 0 ? (
