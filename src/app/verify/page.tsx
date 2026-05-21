@@ -13,7 +13,7 @@ type Step = "wallet" | "personal" | "social" | "wallets" | "complete";
 
 export default function VerifyPage() {
   const { address, isConnected } = useAccount();
-  const { isVerified, score } = useIdentity(address);
+  const { isVerified, score, refetch: refetchIdentity } = useIdentity(address);
   const { create, isPending: isCreating, isConfirming: isCreatingConfirm } = useCreateIdentity();
   const { addCredential, isPending: isAdding, isConfirming: isAddingConfirm } = useAddCredential();
   const { setSocial, isPending: isSettingSocial, isConfirming: isSocialConfirm } = useSetSocial();
@@ -105,6 +105,7 @@ export default function VerifyPage() {
         btcWallet: extraWallets.btc || undefined,
       });
     }
+    refetchIdentity();
     setStep("complete");
   };
 
@@ -302,7 +303,7 @@ export default function VerifyPage() {
             <button onClick={handleExtraWallets} disabled={isLoading} className="btn-primary flex-1 disabled:opacity-50">
               {isLoading ? "Saving..." : "Save & Finish"}
             </button>
-            <button onClick={() => setStep("complete")} className="px-4 py-3 rounded-lg border border-card-border text-muted hover:text-foreground transition-colors">
+            <button onClick={() => { refetchIdentity(); setStep("complete"); }} className="px-4 py-3 rounded-lg border border-card-border text-muted hover:text-foreground transition-colors">
               Skip
             </button>
           </div>

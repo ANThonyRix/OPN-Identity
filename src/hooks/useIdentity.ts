@@ -6,7 +6,7 @@ import { IDENTITY_SBT_ADDRESS } from "@/config/constants";
 import { IDENTITY_SBT_ABI } from "@/config/abi";
 
 export function useIdentity(address?: `0x${string}`) {
-  const { data: isVerified } = useReadContract({
+  const { data: isVerified, refetch: refetchVerified } = useReadContract({
     address: IDENTITY_SBT_ADDRESS as `0x${string}`,
     abi: IDENTITY_SBT_ABI,
     functionName: "isVerified",
@@ -14,7 +14,7 @@ export function useIdentity(address?: `0x${string}`) {
     query: { enabled: !!address },
   });
 
-  const { data: score } = useReadContract({
+  const { data: score, refetch: refetchScore } = useReadContract({
     address: IDENTITY_SBT_ADDRESS as `0x${string}`,
     abi: IDENTITY_SBT_ABI,
     functionName: "getScore",
@@ -22,7 +22,7 @@ export function useIdentity(address?: `0x${string}`) {
     query: { enabled: !!address },
   });
 
-  const { data: credentialKeys } = useReadContract({
+  const { data: credentialKeys, refetch: refetchKeys } = useReadContract({
     address: IDENTITY_SBT_ADDRESS as `0x${string}`,
     abi: IDENTITY_SBT_ABI,
     functionName: "getCredentialKeys",
@@ -30,7 +30,7 @@ export function useIdentity(address?: `0x${string}`) {
     query: { enabled: !!address },
   });
 
-  const { data: identity } = useReadContract({
+  const { data: identity, refetch: refetchIdentity } = useReadContract({
     address: IDENTITY_SBT_ADDRESS as `0x${string}`,
     abi: IDENTITY_SBT_ABI,
     functionName: "getIdentity",
@@ -38,7 +38,14 @@ export function useIdentity(address?: `0x${string}`) {
     query: { enabled: !!address && !!isVerified },
   });
 
-  return { isVerified: !!isVerified, score: Number(score || 0), credentialKeys: credentialKeys || [], identity };
+  const refetch = () => {
+    refetchVerified();
+    refetchScore();
+    refetchKeys();
+    refetchIdentity();
+  };
+
+  return { isVerified: !!isVerified, score: Number(score || 0), credentialKeys: credentialKeys || [], identity, refetch };
 }
 
 export function useCreateIdentity() {
