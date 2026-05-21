@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-contract OPNIdentitySBT {
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/utils/Base64.sol";
+
+contract OPNIdentitySBT is ERC721 {
+    using Strings for uint256;
+    using Strings for uint8;
+
     struct Identity {
         uint8 score;
         uint256 issuedAt;
@@ -16,7 +23,10 @@ contract OPNIdentitySBT {
     }
 
     address public owner;
+    uint256 private _tokenIdCounter;
+
     mapping(address => Identity) private _identities;
+    mapping(address => uint256) private _tokenIds;
     mapping(address => mapping(string => bytes32)) private _credentials;
     mapping(address => string[]) private _credentialKeys;
     mapping(string => CredentialType) private _allowedCredentials;
@@ -42,7 +52,7 @@ contract OPNIdentitySBT {
         _;
     }
 
-    constructor() {
+    constructor() ERC721("OPN Identity SBT", "OPNID") {
         owner = msg.sender;
         _addCredentialType("wallet", 10);
         _addCredentialType("name", 10);
@@ -54,6 +64,75 @@ contract OPNIdentitySBT {
         _addCredentialType("solanaWallet", 10);
         _addCredentialType("btcWallet", 10);
     }
+
+    // === Soulbound: block all transfers ===
+
+    function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
+        address from = _ownerOf(tokenId);
+        // Allow minting (from == address(0)) and burning (to == address(0)), block transfers
+        require(from == address(0) || to == address(0), "SBT: token is non-transferable");
+        return super._update(to, tokenId, auth);
+    }
+
+    function approve(address, uint256) public pure override {
+        revert("SBT: approvals disabled");
+    }
+
+    function setApprovalForAll(address, bool) public pure override {
+        revert("SBT: approvals disabled");
+    }
+
+    // === On-chain metadata ===
+
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        _requireOwned(tokenId);
+        address tokenOwner = ownerOf(tokenId);
+        Identity memory id = _identities[tokenOwner];
+
+        string memory svg = _generateSVG(id.score, tokenOwner);
+
+        string memory json = string(abi.encodePacked(
+            '{"name":"OPN Identity #', tokenId.toString(),
+            '","description":"Soulbound identity token on OPN Network. Trust Score: ', uint256(id.score).toString(),
+            '/100","image":"data:image/svg+xml;base64,', Base64.encode(bytes(svg)),
+            '","attributes":[{"trait_type":"Trust Score","value":', uint256(id.score).toString(),
+            '},{"trait_type":"Credentials","value":', _credentialKeys[tokenOwner].length.toString(),
+            '},{"trait_type":"Issued At","display_type":"date","value":', id.issuedAt.toString(),
+            '}]}'
+        ));
+
+        return string(abi.encodePacked("data:application/json;base64,", Base64.encode(bytes(json))));
+    }
+
+    function _generateSVG(uint8 score, address account) internal pure returns (string memory) {
+        string memory scoreStr = uint256(score).toString();
+        string memory addrStr = Strings.toHexString(uint160(account), 20);
+        string memory shortAddr = string(abi.encodePacked(
+            _substring(addrStr, 0, 6), "...", _substring(addrStr, 38, 42)
+        ));
+
+        return string(abi.encodePacked(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">',
+            '<rect width="400" height="400" rx="20" fill="#0a0e1a"/>',
+            '<circle cx="200" cy="160" r="80" fill="none" stroke="#6c5ce7" stroke-width="8"/>',
+            '<text x="200" y="175" text-anchor="middle" font-size="48" font-weight="bold" fill="white">', scoreStr, '</text>',
+            '<text x="200" y="270" text-anchor="middle" font-size="16" fill="#a0a0a0">Trust Score</text>',
+            '<text x="200" y="310" text-anchor="middle" font-size="14" fill="#6c5ce7">OPN Identity SBT</text>',
+            '<text x="200" y="350" text-anchor="middle" font-size="12" font-family="monospace" fill="#666">', shortAddr, '</text>',
+            '</svg>'
+        ));
+    }
+
+    function _substring(string memory str, uint256 startIndex, uint256 endIndex) internal pure returns (string memory) {
+        bytes memory strBytes = bytes(str);
+        bytes memory result = new bytes(endIndex - startIndex);
+        for (uint256 i = startIndex; i < endIndex; i++) {
+            result[i - startIndex] = strBytes[i];
+        }
+        return string(result);
+    }
+
+    // === Identity logic ===
 
     function _addCredentialType(string memory credentialType, uint8 points) internal {
         _allowedCredentials[credentialType] = CredentialType({ points: points, exists: true });
@@ -69,6 +148,13 @@ contract OPNIdentitySBT {
 
     function createIdentity(bytes32 dataHash) external {
         require(!_identities[msg.sender].exists, "Identity already exists");
+
+        _tokenIdCounter++;
+        uint256 newTokenId = _tokenIdCounter;
+
+        _mint(msg.sender, newTokenId);
+        _tokenIds[msg.sender] = newTokenId;
+
         _identities[msg.sender] = Identity({
             score: 0,
             issuedAt: block.timestamp,
@@ -76,6 +162,7 @@ contract OPNIdentitySBT {
             dataHash: dataHash,
             exists: true
         });
+
         emit IdentityCreated(msg.sender, 0);
     }
 
@@ -137,6 +224,11 @@ contract OPNIdentitySBT {
     function getCredentialPoints(string calldata credentialType) external view returns (uint8) {
         require(_allowedCredentials[credentialType].exists, "Invalid type");
         return _allowedCredentials[credentialType].points;
+    }
+
+    function getTokenId(address account) external view returns (uint256) {
+        require(_identities[account].exists, "No identity found");
+        return _tokenIds[account];
     }
 
     function transferOwnership(address newOwner) external onlyOwner {
