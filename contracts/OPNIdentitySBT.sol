@@ -25,6 +25,10 @@ contract OPNIdentitySBT is ERC721 {
     address public owner;
     uint256 private _tokenIdCounter;
 
+    bytes32 private constant TWITTER_HASH = keccak256("twitter");
+    bytes32 private constant DISCORD_HASH = keccak256("discord");
+    bytes32 private constant EMAIL_HASH = keccak256("email");
+
     mapping(address => Identity) private _identities;
     mapping(address => uint256) private _tokenIds;
     mapping(address => mapping(string => bytes32)) private _credentials;
@@ -148,12 +152,10 @@ contract OPNIdentitySBT is ERC721 {
 
     function createIdentity(bytes32 dataHash) external {
         require(!_identities[msg.sender].exists, "Identity already exists");
+        require(dataHash != bytes32(0), "Empty hash");
 
         _tokenIdCounter++;
         uint256 newTokenId = _tokenIdCounter;
-
-        _mint(msg.sender, newTokenId);
-        _tokenIds[msg.sender] = newTokenId;
 
         _identities[msg.sender] = Identity({
             score: 0,
@@ -162,11 +164,15 @@ contract OPNIdentitySBT is ERC721 {
             dataHash: dataHash,
             exists: true
         });
+        _tokenIds[msg.sender] = newTokenId;
+
+        _mint(msg.sender, newTokenId);
 
         emit IdentityCreated(msg.sender, 0);
     }
 
     function addCredential(string calldata credentialType, bytes32 credentialHash) external onlyHolder {
+        require(credentialHash != bytes32(0), "Empty hash");
         require(_allowedCredentials[credentialType].exists, "Invalid credential type");
         require(_credentials[msg.sender][credentialType] == bytes32(0), "Credential already added");
 
@@ -239,9 +245,9 @@ contract OPNIdentitySBT is ERC721 {
 
     function setSocial(bytes32 platformHash, bytes32 handleHash) external onlyHolder {
         require(
-            platformHash == keccak256("twitter") ||
-            platformHash == keccak256("discord") ||
-            platformHash == keccak256("email"),
+            platformHash == TWITTER_HASH ||
+            platformHash == DISCORD_HASH ||
+            platformHash == EMAIL_HASH,
             "Unsupported platform"
         );
         require(handleHash != bytes32(0), "Empty handle");
