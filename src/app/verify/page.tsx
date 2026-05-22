@@ -56,13 +56,16 @@ export default function VerifyPage() {
   const [extraWallets, setExtraWallets] = useState({ evm: "", solana: "", btc: "" });
   const [walletErrors, setWalletErrors] = useState<{ evm?: string; solana?: string; btc?: string }>({});
   const [personalErrors, setPersonalErrors] = useState<{ email?: string }>({});
-  const [linkedSocials, setLinkedSocials] = useState<{ twitter?: string; discord?: string }>(() => {
-    if (typeof window === "undefined" || !address) return {};
+  const [linkedSocials, setLinkedSocials] = useState<{ twitter?: string; discord?: string }>({});
+
+  // Re-read linkedSocials from sessionStorage when address becomes available
+  useEffect(() => {
+    if (!address || typeof window === "undefined") return;
     try {
       const stored = sessionStorage.getItem(`opn-verify-socials-${address}`);
-      return stored ? JSON.parse(stored) : {};
-    } catch { return {}; }
-  });
+      if (stored) setLinkedSocials(JSON.parse(stored));
+    } catch {}
+  }, [address]);
   const [txStatus, setTxStatus] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -90,7 +93,15 @@ export default function VerifyPage() {
       if (address) {
         saveCredentialData(address, { [provider]: handle });
       }
-      const updated = { ...linkedSocials, [provider]: handle };
+      // Read current socials from sessionStorage to avoid stale closure
+      let current: { twitter?: string; discord?: string } = {};
+      if (address) {
+        try {
+          const stored = sessionStorage.getItem(`opn-verify-socials-${address}`);
+          if (stored) current = JSON.parse(stored);
+        } catch {}
+      }
+      const updated = { ...current, [provider]: handle };
       setLinkedSocials(updated);
       if (address) sessionStorage.setItem(`opn-verify-socials-${address}`, JSON.stringify(updated));
       signOut({ redirect: false });
