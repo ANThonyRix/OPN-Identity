@@ -95,8 +95,9 @@ export default function VerifyPage() {
       if (address) sessionStorage.setItem(`opn-verify-socials-${address}`, JSON.stringify(updated));
       signOut({ redirect: false });
       setTxStatus("");
-    } catch (e) {
-      setTxStatus(`Failed to link ${provider}. Please try again.`);
+    } catch (e: any) {
+      const detail = e?.shortMessage || e?.message || "Unknown error";
+      setTxStatus(`Error: ${detail}`);
     } finally {
       setIsProcessing(false);
     }
@@ -110,16 +111,25 @@ export default function VerifyPage() {
 
       if (!isVerified) {
         setTxStatus("Creating on-chain identity (confirm in wallet)...");
-        await create(address || "");
+        try {
+          await create(address || "");
+        } catch (e: any) {
+          const msg = e?.shortMessage || e?.message || "";
+          if (!msg.toLowerCase().includes("already") && !msg.toLowerCase().includes("exists")) {
+            throw e;
+          }
+        }
       }
 
       setTxStatus("Adding wallet credential (confirm in wallet)...");
       await addCredential("wallet", `${address}:wallet:verified`);
 
       setWalletSigned(true);
+      storeStep(address, "personal");
       setTxStatus("");
-    } catch (e) {
-      setTxStatus("Transaction failed or rejected. Please try again.");
+    } catch (e: any) {
+      const detail = e?.shortMessage || e?.message || "Unknown error";
+      setTxStatus(`Error: ${detail}`);
     } finally {
       setIsProcessing(false);
     }
@@ -148,8 +158,9 @@ export default function VerifyPage() {
       }
       setTxStatus("");
       setStep("social");
-    } catch (e) {
-      setTxStatus("Transaction failed or rejected. Please try again.");
+    } catch (e: any) {
+      const detail = e?.shortMessage || e?.message || "Unknown error";
+      setTxStatus(`Error: ${detail}`);
     } finally {
       setIsProcessing(false);
     }
@@ -190,8 +201,9 @@ export default function VerifyPage() {
       setTxStatus("");
       refetchIdentity();
       setStep("complete");
-    } catch (e) {
-      setTxStatus("Transaction failed or rejected. Please try again.");
+    } catch (e: any) {
+      const detail = e?.shortMessage || e?.message || "Unknown error";
+      setTxStatus(`Error: ${detail}`);
     } finally {
       setIsProcessing(false);
     }
