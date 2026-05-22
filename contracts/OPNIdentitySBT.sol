@@ -96,7 +96,7 @@ contract OPNIdentitySBT is ERC721 {
 
         string memory json = string(abi.encodePacked(
             '{"name":"OPN Identity #', tokenId.toString(),
-            '","description":"Soulbound identity token on OPN Network. View Trust Score at opnid.app","image":"data:image/svg+xml;base64,', Base64.encode(bytes(svg)),
+            '","description":"Soulbound identity token on OPN Network. View Trust Score at https://opn-identity.vercel.app","image":"data:image/svg+xml;base64,', Base64.encode(bytes(svg)),
             '","attributes":[{"trait_type":"Verified","value":"Yes"},{"trait_type":"Issued At","display_type":"date","value":', _identities[tokenOwner].issuedAt.toString(),
             '}]}'
         ));
