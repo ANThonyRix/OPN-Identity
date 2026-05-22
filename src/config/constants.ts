@@ -10,7 +10,6 @@ export const VERIFICATION_SCORES: Record<string, number> = {
   evmWallet: 10,
   solanaWallet: 10,
   btcWallet: 10,
-  onchainActivity: 20,
 };
 
-export const MAX_SCORE = Object.values(VERIFICATION_SCORES).reduce((a, b) => a + b, 0);
+export const MAX_SCORE = 100;
