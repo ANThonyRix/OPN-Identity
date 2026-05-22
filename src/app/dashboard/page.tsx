@@ -4,18 +4,24 @@ import { useState, useEffect } from "react";
 import { useAccount } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { signIn, signOut, useSession } from "next-auth/react";
-import { useIdentity, useUpdateCredential, useSetSocial } from "@/hooks/useIdentity";
+import { useIdentity, useUpdateCredential, useAddCredential, useSetSocial } from "@/hooks/useIdentity";
 import { getCredentialData, saveCredentialData, UserCredentialData } from "@/lib/storage";
 import { isValidEmail, isValidEvmAddress, isValidSolanaAddress, isValidBtcAddress } from "@/lib/validation";
+import { VERIFICATION_SCORES } from "@/config/constants";
 import Link from "next/link";
 
 export default function DashboardPage() {
   const { address, isConnected } = useAccount();
-  const { isVerified, score, credentialKeys } = useIdentity(address);
+  const { isVerified, score, credentialKeys, refetch: refetchIdentity } = useIdentity(address);
   const { updateCredential, isPending } = useUpdateCredential();
+  const { addCredential, isPending: isAddingCredential } = useAddCredential();
   const { setSocial, isPending: isSocialPending } = useSetSocial();
   const { data: session } = useSession();
   const [isEditing, setIsEditing] = useState(false);
+  const [isAddingNew, setIsAddingNew] = useState(false);
+  const [newCredData, setNewCredData] = useState<Record<string, string>>({});
+  const [newCredErrors, setNewCredErrors] = useState<Record<string, string>>({});
+  const [addStatus, setAddStatus] = useState("");
   const [editData, setEditData] = useState<UserCredentialData>({});
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -23,7 +29,7 @@ export default function DashboardPage() {
     address ? getCredentialData(address) : {}
   );
 
-  const isLoading = isPending || isSocialPending || isSaving;
+  const isLoading = isPending || isSocialPending || isSaving || isAddingCredential;
 
   // Handle OAuth callback for re-linking socials
   useEffect(() => {
@@ -286,9 +292,117 @@ export default function DashboardPage() {
       <div className="card">
         <h2 className="text-xl font-semibold mb-2">Add More Credentials</h2>
         <p className="text-sm text-muted mb-4">Increase your Trust Score by adding more verifications.</p>
-        <Link href="/verify" className="btn-primary inline-block text-sm">
-          Add Credentials
-        </Link>
+
+        {(() => {
+          const allTypes = Object.keys(VERIFICATION_SCORES);
+          const existing = credentialKeys as string[];
+          const missing = allTypes.filter((t) => t !== "wallet" && !existing.includes(t));
+
+          if (missing.length === 0) {
+            return <p className="text-sm text-green-400">All credentials verified! Maximum score achieved.</p>;
+          }
+
+          if (!isAddingNew) {
+            return (
+              <button onClick={() => setIsAddingNew(true)} className="btn-primary inline-block text-sm">
+                Add Credentials ({missing.length} available)
+              </button>
+            );
+          }
+
+          return (
+            <div className="space-y-4">
+              {addStatus && (
+                <div className="text-center py-2 px-4 rounded-lg bg-accent/10 border border-accent/30 text-accent text-sm animate-pulse">
+                  {addStatus}
+                </div>
+              )}
+              <div className="space-y-3">
+                {missing.map((key) => {
+                  if (key === "twitter" || key === "discord") {
+                    return (
+                      <div key={key} className="flex items-center justify-between py-2 border-b border-card-border last:border-0">
+                        <span className="text-sm">{credentialLabels[key] || key} (+{VERIFICATION_SCORES[key]} pts)</span>
+                        <button
+                          onClick={() => signIn(key, { callbackUrl: "/dashboard" })}
+                          disabled={isLoading}
+                          className="text-xs text-accent hover:text-accent-hover transition-colors disabled:opacity-50"
+                        >
+                          Link via OAuth
+                        </button>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={key} className="py-2 border-b border-card-border last:border-0">
+                      <label className="text-sm block mb-1">{credentialLabels[key] || key} (+{VERIFICATION_SCORES[key]} pts)</label>
+                      <input
+                        type="text"
+                        value={newCredData[key] || ""}
+                        onChange={(e) => { setNewCredData({ ...newCredData, [key]: e.target.value }); setNewCredErrors({ ...newCredErrors, [key]: "" }); }}
+                        placeholder={credentialPlaceholders[key] || "Enter value"}
+                        className={`w-full text-xs px-3 py-2 rounded bg-background border ${newCredErrors[key] ? "border-red-500" : "border-card-border"} focus:border-accent outline-none font-mono`}
+                        disabled={isLoading}
+                      />
+                      {newCredErrors[key] && <p className="text-red-400 text-xs mt-0.5">{newCredErrors[key]}</p>}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    const errors: Record<string, string> = {};
+                    if (newCredData.email?.trim() && !isValidEmail(newCredData.email.trim())) errors.email = "Invalid email.";
+                    if (newCredData.evmWallet?.trim() && !isValidEvmAddress(newCredData.evmWallet.trim())) errors.evmWallet = "Invalid EVM address.";
+                    if (newCredData.solanaWallet?.trim() && !isValidSolanaAddress(newCredData.solanaWallet.trim())) errors.solanaWallet = "Invalid Solana address.";
+                    if (newCredData.btcWallet?.trim() && !isValidBtcAddress(newCredData.btcWallet.trim())) errors.btcWallet = "Invalid Bitcoin address.";
+                    setNewCredErrors(errors);
+                    if (Object.keys(errors).length > 0) return;
+
+                    setIsSaving(true);
+                    try {
+                      const fields = Object.entries(newCredData).filter(([, v]) => v.trim());
+                      for (const [key, value] of fields) {
+                        setAddStatus(`Adding ${key} (confirm in wallet)...`);
+                        await addCredential(key, `${address}:${key}:${value.trim()}`);
+                        if (key === "email") {
+                          setAddStatus("Linking email on-chain...");
+                          await setSocial("email", value.trim().toLowerCase());
+                        }
+                      }
+                      if (address && fields.length > 0) {
+                        const dataToSave: Record<string, string> = {};
+                        fields.forEach(([k, v]) => { dataToSave[k] = v.trim(); });
+                        saveCredentialData(address, dataToSave);
+                        setSavedData((prev) => ({ ...prev, ...dataToSave }));
+                      }
+                      setAddStatus("");
+                      setNewCredData({});
+                      setIsAddingNew(false);
+                      refetchIdentity();
+                    } catch (e: any) {
+                      const detail = e?.shortMessage || e?.message || "Unknown error";
+                      setAddStatus(`Error: ${detail}`);
+                    } finally {
+                      setIsSaving(false);
+                    }
+                  }}
+                  disabled={isLoading || Object.values(newCredData).every((v) => !v.trim())}
+                  className="btn-primary text-sm disabled:opacity-50"
+                >
+                  {isLoading ? "Processing..." : "Save On-Chain"}
+                </button>
+                <button
+                  onClick={() => { setIsAddingNew(false); setNewCredData({}); setNewCredErrors({}); setAddStatus(""); }}
+                  className="px-4 py-2 text-sm text-muted hover:text-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
