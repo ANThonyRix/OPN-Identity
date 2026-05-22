@@ -75,6 +75,19 @@ export default function FAQPage() {
         <p className="text-muted">Everything you need to know about OPN Identity Verification</p>
       </div>
 
+      <div className="card text-center space-y-2">
+        <h3 className="text-sm text-muted">Smart Contract Address</h3>
+        <a
+          href="https://testnet.iopn.tech/address/0x5e61fec0E2193e2e57D822c940ffC2Ce79b8F2f3"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-accent hover:text-accent-hover font-mono text-sm sm:text-base break-all"
+        >
+          0x5e61fec0E2193e2e57D822c940ffC2Ce79b8F2f3
+        </a>
+        <p className="text-xs text-muted">OPN Chain Testnet (Chain ID: 984)</p>
+      </div>
+
       <div className="space-y-3">
         {faqItems.map((item, index) => (
           <div key={index} className="card cursor-pointer" onClick={() => setOpenIndex(openIndex === index ? null : index)}>
