@@ -45,12 +45,10 @@ export default function VerifyPage() {
 
   useEffect(() => {
     const restored = getStoredStep(address);
-    if (restored) {
+    if (restored && !isVerified) {
+      // Only restore step from session if not yet verified on-chain
       setStepRaw(restored);
       if (restored !== "wallet") setWalletSigned(true);
-    } else if (isVerified) {
-      setStepRaw("personal");
-      setWalletSigned(true);
     }
   }, [address, isVerified]);
   const [personalData, setPersonalData] = useState({ name: "", email: "", bio: "" });
