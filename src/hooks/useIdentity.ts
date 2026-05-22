@@ -104,6 +104,34 @@ export function useAddCredential() {
   return { addCredential, isPending, hash };
 }
 
+export function useAddCredentials() {
+  const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
+  const [isPending, setIsPending] = useState(false);
+  const [hash, setHash] = useState<`0x${string}` | undefined>();
+
+  const addCredentials = useCallback(async (items: { type: string; data: string }[]) => {
+    setIsPending(true);
+    try {
+      const types = items.map((i) => i.type);
+      const hashes = items.map((i) => keccak256(toBytes(i.data)));
+      const txHash = await writeContractAsync({
+        address: IDENTITY_SBT_ADDRESS as `0x${string}`,
+        abi: IDENTITY_SBT_ABI,
+        functionName: "addCredentials",
+        args: [types, hashes],
+      });
+      setHash(txHash);
+      await publicClient!.waitForTransactionReceipt({ hash: txHash });
+      return txHash;
+    } finally {
+      setIsPending(false);
+    }
+  }, [writeContractAsync, publicClient]);
+
+  return { addCredentials, isPending, hash };
+}
+
 export function useUpdateCredential() {
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();

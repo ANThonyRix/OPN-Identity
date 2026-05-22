@@ -55,6 +55,16 @@ export const IDENTITY_SBT_ABI = [
   },
   {
     inputs: [
+      { name: "credentialTypes", type: "string[]" },
+      { name: "credentialHashes", type: "bytes32[]" },
+    ],
+    name: "addCredentials",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
       { name: "credentialType", type: "string" },
       { name: "newCredentialHash", type: "bytes32" },
     ],

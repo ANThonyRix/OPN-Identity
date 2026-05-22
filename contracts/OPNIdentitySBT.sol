@@ -184,6 +184,34 @@ contract OPNIdentitySBT is ERC721 {
         emit IdentityUpdated(msg.sender, newScore);
     }
 
+    function addCredentials(string[] calldata credentialTypes, bytes32[] calldata credentialHashes) external onlyHolder {
+        require(credentialTypes.length == credentialHashes.length, "Length mismatch");
+        require(credentialTypes.length > 0, "Empty arrays");
+
+        uint16 totalPoints = uint16(_identities[msg.sender].score);
+
+        for (uint256 i = 0; i < credentialTypes.length; i++) {
+            string calldata credType = credentialTypes[i];
+            bytes32 credHash = credentialHashes[i];
+
+            require(credHash != bytes32(0), "Empty hash");
+            require(_allowedCredentials[credType].exists, "Invalid credential type");
+            require(_credentials[msg.sender][credType] == bytes32(0), "Credential already added");
+
+            _credentials[msg.sender][credType] = credHash;
+            _credentialKeys[msg.sender].push(credType);
+            totalPoints += uint16(_allowedCredentials[credType].points);
+
+            emit CredentialAdded(msg.sender, credType, credHash);
+        }
+
+        uint8 newScore = totalPoints > 100 ? 100 : uint8(totalPoints);
+        _identities[msg.sender].score = newScore;
+        _identities[msg.sender].updatedAt = block.timestamp;
+
+        emit IdentityUpdated(msg.sender, newScore);
+    }
+
     function updateCredential(string calldata credentialType, bytes32 newCredentialHash) external onlyHolder {
         require(_allowedCredentials[credentialType].exists, "Invalid credential type");
         require(_credentials[msg.sender][credentialType] != bytes32(0), "Credential not found");

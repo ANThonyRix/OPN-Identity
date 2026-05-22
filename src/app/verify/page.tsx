@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useAccount, useSignMessage } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { signIn, signOut, useSession } from "next-auth/react";
-import { useIdentity, useCreateIdentity, useAddCredential, useSetSocial } from "@/hooks/useIdentity";
+import { useIdentity, useCreateIdentity, useAddCredential, useAddCredentials, useSetSocial } from "@/hooks/useIdentity";
 import { VERIFICATION_SCORES } from "@/config/constants";
 import { saveCredentialData } from "@/lib/storage";
 import { validateWallets, isValidEmail } from "@/lib/validation";
@@ -30,6 +30,7 @@ export default function VerifyPage() {
   const { isVerified, score, refetch: refetchIdentity } = useIdentity(address);
   const { create, isPending: isCreating } = useCreateIdentity();
   const { addCredential, isPending: isAdding } = useAddCredential();
+  const { addCredentials, isPending: isBatchAdding } = useAddCredentials();
   const { setSocial, isPending: isSettingSocial } = useSetSocial();
   const { signMessageAsync } = useSignMessage();
   const { data: session } = useSession();
@@ -69,7 +70,7 @@ export default function VerifyPage() {
   const [txStatus, setTxStatus] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const isLoading = isCreating || isAdding || isSettingSocial || isProcessing;
+  const isLoading = isCreating || isAdding || isBatchAdding || isSettingSocial || isProcessing;
 
   useEffect(() => {
     if (session && step === "social") {
@@ -156,9 +157,17 @@ export default function VerifyPage() {
 
     try {
       const fields = Object.entries(personalData).filter(([, v]) => v.trim());
-      for (const [key, value] of fields) {
-        setTxStatus(`Saving ${key} (confirm in wallet)...`);
-        await addCredential(key, `${address}:${key}:${value}`);
+      if (fields.length > 0) {
+        setTxStatus(`Saving ${fields.length} credential(s) in one transaction...`);
+        const items = fields.map(([key, value]) => ({
+          type: key,
+          data: `${address}:${key}:${value}`,
+        }));
+        if (items.length === 1) {
+          await addCredential(items[0].type, items[0].data);
+        } else {
+          await addCredentials(items);
+        }
       }
       if (personalData.email.trim()) {
         setTxStatus("Linking email on-chain (confirm in wallet)...");
@@ -190,18 +199,26 @@ export default function VerifyPage() {
 
     setIsProcessing(true);
     try {
+      const items: { type: string; data: string }[] = [];
       if (extraWallets.evm.trim()) {
-        setTxStatus("Adding EVM wallet (confirm in wallet)...");
-        await addCredential("evmWallet", `${address}:evm:${extraWallets.evm}`);
+        items.push({ type: "evmWallet", data: `${address}:evm:${extraWallets.evm}` });
       }
       if (extraWallets.solana.trim()) {
-        setTxStatus("Adding Solana wallet (confirm in wallet)...");
-        await addCredential("solanaWallet", `${address}:solana:${extraWallets.solana}`);
+        items.push({ type: "solanaWallet", data: `${address}:solana:${extraWallets.solana}` });
       }
       if (extraWallets.btc.trim()) {
-        setTxStatus("Adding Bitcoin wallet (confirm in wallet)...");
-        await addCredential("btcWallet", `${address}:btc:${extraWallets.btc}`);
+        items.push({ type: "btcWallet", data: `${address}:btc:${extraWallets.btc}` });
       }
+
+      if (items.length > 0) {
+        setTxStatus(`Adding ${items.length} wallet(s) in one transaction...`);
+        if (items.length === 1) {
+          await addCredential(items[0].type, items[0].data);
+        } else {
+          await addCredentials(items);
+        }
+      }
+
       if (address) {
         saveCredentialData(address, {
           evmWallet: extraWallets.evm || undefined,
@@ -301,7 +318,7 @@ export default function VerifyPage() {
       {step === "personal" && (
         <div className="card space-y-4">
           <h2 className="text-xl font-semibold">Step 2: Personal Information</h2>
-          <p className="text-muted text-sm">Add personal details. Only hashes are stored on-chain - your data stays private. Each field requires a separate transaction.</p>
+          <p className="text-muted text-sm">Add personal details. Only hashes are stored on-chain - your data stays private. All fields are saved in a single transaction.</p>
           <div className="space-y-3">
             <input
               type="text"
@@ -393,7 +410,7 @@ export default function VerifyPage() {
       {step === "wallets" && (
         <div className="card space-y-4">
           <h2 className="text-xl font-semibold">Step 4: Link Other Wallets</h2>
-          <p className="text-muted text-sm">Add wallets from other chains to prove cross-chain presence. Each wallet requires a separate transaction.</p>
+          <p className="text-muted text-sm">Add wallets from other chains to prove cross-chain presence. All wallets are saved in a single transaction.</p>
           <div className="space-y-3">
             <div>
               <input
