@@ -31,7 +31,7 @@ export default function DashboardPage() {
 
   const isLoading = isPending || isSocialPending || isSaving || isAddingCredential;
 
-  // Handle OAuth callback for re-linking socials
+  // Handle OAuth callback for linking/re-linking socials
   useEffect(() => {
     if (session && address) {
       const provider = (session as { provider?: string }).provider;
@@ -39,14 +39,24 @@ export default function DashboardPage() {
 
       if (provider && username && (provider === "twitter" || provider === "discord")) {
         const handle = provider === "twitter" ? username.toLowerCase() : username;
+        const existing = credentialKeys as string[];
+        const isUpdate = existing.includes(provider);
+
         (async () => {
           setIsSaving(true);
           try {
-            await updateCredential(provider, `${address}:${provider}:${handle}`);
+            if (isUpdate) {
+              await updateCredential(provider, `${address}:${provider}:${handle}`);
+            } else {
+              await addCredential(provider, `${address}:${provider}:${handle}`);
+            }
             await setSocial(provider, handle);
             saveCredentialData(address, { [provider]: handle });
             setSavedData((prev) => ({ ...prev, [provider]: handle }));
             signOut({ redirect: false });
+            refetchIdentity();
+          } catch (e: any) {
+            console.error(`Failed to link ${provider}:`, e);
           } finally {
             setIsSaving(false);
           }
