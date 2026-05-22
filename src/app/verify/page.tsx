@@ -11,24 +11,62 @@ import { validateWallets, isValidEmail } from "@/lib/validation";
 
 type Step = "wallet" | "personal" | "social" | "wallets" | "complete";
 
+const STEPS: Step[] = ["wallet", "personal", "social", "wallets", "complete"];
+
+function getStoredStep(address: string | undefined): Step | null {
+  if (!address || typeof window === "undefined") return null;
+  const stored = sessionStorage.getItem(`opn-verify-step-${address}`);
+  if (stored && STEPS.includes(stored as Step)) return stored as Step;
+  return null;
+}
+
+function storeStep(address: string | undefined, step: Step) {
+  if (!address || typeof window === "undefined") return;
+  sessionStorage.setItem(`opn-verify-step-${address}`, step);
+}
+
 export default function VerifyPage() {
   const { address, isConnected } = useAccount();
   const { isVerified, score, refetch: refetchIdentity } = useIdentity(address);
-  const { create, isPending: isCreating, isConfirming: isCreatingConfirm } = useCreateIdentity();
-  const { addCredential, isPending: isAdding, isConfirming: isAddingConfirm } = useAddCredential();
-  const { setSocial, isPending: isSettingSocial, isConfirming: isSocialConfirm } = useSetSocial();
+  const { create, isPending: isCreating } = useCreateIdentity();
+  const { addCredential, isPending: isAdding } = useAddCredential();
+  const { setSocial, isPending: isSettingSocial } = useSetSocial();
   const { signMessageAsync } = useSignMessage();
   const { data: session } = useSession();
 
-  const [step, setStep] = useState<Step>("wallet");
+  const [step, setStepRaw] = useState<Step>("wallet");
   const [walletSigned, setWalletSigned] = useState(false);
+
+  const setStep = (s: Step) => {
+    setStepRaw(s);
+    storeStep(address, s);
+  };
+
+  useEffect(() => {
+    const restored = getStoredStep(address);
+    if (restored) {
+      setStepRaw(restored);
+      if (restored !== "wallet") setWalletSigned(true);
+    } else if (isVerified) {
+      setStepRaw("personal");
+      setWalletSigned(true);
+    }
+  }, [address, isVerified]);
   const [personalData, setPersonalData] = useState({ name: "", email: "", bio: "" });
   const [extraWallets, setExtraWallets] = useState({ evm: "", solana: "", btc: "" });
   const [walletErrors, setWalletErrors] = useState<{ evm?: string; solana?: string; btc?: string }>({});
   const [personalErrors, setPersonalErrors] = useState<{ email?: string }>({});
-  const [linkedSocials, setLinkedSocials] = useState<{ twitter?: string; discord?: string }>({});
+  const [linkedSocials, setLinkedSocials] = useState<{ twitter?: string; discord?: string }>(() => {
+    if (typeof window === "undefined" || !address) return {};
+    try {
+      const stored = sessionStorage.getItem(`opn-verify-socials-${address}`);
+      return stored ? JSON.parse(stored) : {};
+    } catch { return {}; }
+  });
+  const [txStatus, setTxStatus] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const isLoading = isCreating || isCreatingConfirm || isAdding || isAddingConfirm || isSettingSocial || isSocialConfirm;
+  const isLoading = isCreating || isAdding || isSettingSocial || isProcessing;
 
   useEffect(() => {
     if (session && step === "social") {
@@ -37,76 +75,126 @@ export default function VerifyPage() {
 
       if (provider && username && !linkedSocials[provider as "twitter" | "discord"]) {
         const handle = provider === "twitter" ? username.toLowerCase() : username;
-        addCredential(provider, `${address}:${provider}:${handle}`);
-        setSocial(provider, handle);
-        if (address) {
-          saveCredentialData(address, { [provider]: handle });
-        }
-        setLinkedSocials((prev) => ({ ...prev, [provider]: handle }));
-        signOut({ redirect: false });
+        handleSocialLink(provider, handle);
       }
     }
   }, [session, step]);
 
-  const handleSignWallet = async () => {
+  const handleSocialLink = async (provider: string, handle: string) => {
+    setIsProcessing(true);
     try {
-      await signMessageAsync({ message: `OPN Identity Verification: ${address}` });
-      setWalletSigned(true);
-      if (!isVerified) {
-        create(address || "");
+      setTxStatus(`Adding ${provider} credential...`);
+      await addCredential(provider, `${address}:${provider}:${handle}`);
+      setTxStatus(`Linking ${provider} handle on-chain...`);
+      await setSocial(provider, handle);
+      if (address) {
+        saveCredentialData(address, { [provider]: handle });
       }
-      addCredential("wallet", `${address}:wallet:verified`);
-    } catch {}
+      const updated = { ...linkedSocials, [provider]: handle };
+      setLinkedSocials(updated);
+      if (address) sessionStorage.setItem(`opn-verify-socials-${address}`, JSON.stringify(updated));
+      signOut({ redirect: false });
+      setTxStatus("");
+    } catch (e) {
+      setTxStatus(`Failed to link ${provider}. Please try again.`);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  const handlePersonalSubmit = () => {
+  const handleSignWallet = async () => {
+    setIsProcessing(true);
+    try {
+      setTxStatus("Signing message...");
+      await signMessageAsync({ message: `OPN Identity Verification: ${address}` });
+
+      if (!isVerified) {
+        setTxStatus("Creating on-chain identity (confirm in wallet)...");
+        await create(address || "");
+      }
+
+      setTxStatus("Adding wallet credential (confirm in wallet)...");
+      await addCredential("wallet", `${address}:wallet:verified`);
+
+      setWalletSigned(true);
+      setTxStatus("");
+    } catch (e) {
+      setTxStatus("Transaction failed or rejected. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handlePersonalSubmit = async () => {
     if (personalData.email.trim() && !isValidEmail(personalData.email.trim())) {
       setPersonalErrors({ email: "Invalid email format. Example: user@example.com" });
       return;
     }
     setPersonalErrors({});
+    setIsProcessing(true);
 
-    const fields = Object.entries(personalData).filter(([, v]) => v.trim());
-    fields.forEach(([key, value]) => {
-      addCredential(key, `${address}:${key}:${value}`);
-    });
-    if (personalData.email.trim()) {
-      setSocial("email", personalData.email.trim().toLowerCase());
+    try {
+      const fields = Object.entries(personalData).filter(([, v]) => v.trim());
+      for (const [key, value] of fields) {
+        setTxStatus(`Saving ${key} (confirm in wallet)...`);
+        await addCredential(key, `${address}:${key}:${value}`);
+      }
+      if (personalData.email.trim()) {
+        setTxStatus("Linking email on-chain (confirm in wallet)...");
+        await setSocial("email", personalData.email.trim().toLowerCase());
+      }
+      if (address) {
+        saveCredentialData(address, personalData);
+      }
+      setTxStatus("");
+      setStep("social");
+    } catch (e) {
+      setTxStatus("Transaction failed or rejected. Please try again.");
+    } finally {
+      setIsProcessing(false);
     }
-    if (address) {
-      saveCredentialData(address, personalData);
-    }
-    setStep("social");
   };
 
   const handleOAuthLink = (provider: "twitter" | "discord") => {
-    signIn(provider, { redirect: false, callbackUrl: "/verify" });
+    storeStep(address, "social");
+    signIn(provider, { callbackUrl: "/verify" });
   };
 
-  const handleExtraWallets = () => {
+  const handleExtraWallets = async () => {
     const errors = validateWallets(extraWallets);
     setWalletErrors(errors);
 
     if (Object.keys(errors).length > 0) return;
 
-    if (extraWallets.evm.trim()) {
-      addCredential("evmWallet", `${address}:evm:${extraWallets.evm}`);
+    setIsProcessing(true);
+    try {
+      if (extraWallets.evm.trim()) {
+        setTxStatus("Adding EVM wallet (confirm in wallet)...");
+        await addCredential("evmWallet", `${address}:evm:${extraWallets.evm}`);
+      }
+      if (extraWallets.solana.trim()) {
+        setTxStatus("Adding Solana wallet (confirm in wallet)...");
+        await addCredential("solanaWallet", `${address}:solana:${extraWallets.solana}`);
+      }
+      if (extraWallets.btc.trim()) {
+        setTxStatus("Adding Bitcoin wallet (confirm in wallet)...");
+        await addCredential("btcWallet", `${address}:btc:${extraWallets.btc}`);
+      }
+      if (address) {
+        saveCredentialData(address, {
+          evmWallet: extraWallets.evm || undefined,
+          solanaWallet: extraWallets.solana || undefined,
+          btcWallet: extraWallets.btc || undefined,
+        });
+      }
+      setTxStatus("");
+      refetchIdentity();
+      setStep("complete");
+    } catch (e) {
+      setTxStatus("Transaction failed or rejected. Please try again.");
+    } finally {
+      setIsProcessing(false);
     }
-    if (extraWallets.solana.trim()) {
-      addCredential("solanaWallet", `${address}:solana:${extraWallets.solana}`);
-    }
-    if (extraWallets.btc.trim()) {
-      addCredential("btcWallet", `${address}:btc:${extraWallets.btc}`);
-    }
-    if (address) {
-      saveCredentialData(address, {
-        evmWallet: extraWallets.evm || undefined,
-        solanaWallet: extraWallets.solana || undefined,
-        btcWallet: extraWallets.btc || undefined,
-      });
-    }
-    refetchIdentity();
-    setStep("complete");
   };
 
   if (!isConnected) {
@@ -159,6 +247,12 @@ export default function VerifyPage() {
         </div>
       </div>
 
+      {txStatus && (
+        <div className="text-center py-2 px-4 rounded-lg bg-accent/10 border border-accent/30 text-accent text-sm animate-pulse">
+          {txStatus}
+        </div>
+      )}
+
       {step === "wallet" && (
         <div className="card space-y-4">
           <h2 className="text-xl font-semibold">Step 1: Prove Wallet Ownership</h2>
@@ -192,6 +286,7 @@ export default function VerifyPage() {
               value={personalData.name}
               onChange={(e) => setPersonalData({ ...personalData, name: e.target.value })}
               className="w-full px-4 py-3 rounded-lg bg-background border border-card-border focus:border-accent outline-none"
+              disabled={isLoading}
             />
             <div>
               <input
@@ -200,6 +295,7 @@ export default function VerifyPage() {
                 value={personalData.email}
                 onChange={(e) => { setPersonalData({ ...personalData, email: e.target.value }); setPersonalErrors({}); }}
                 className={`w-full px-4 py-3 rounded-lg bg-background border ${personalErrors.email ? "border-red-500" : "border-card-border"} focus:border-accent outline-none`}
+                disabled={isLoading}
               />
               {personalErrors.email && <p className="text-red-400 text-xs mt-1">{personalErrors.email}</p>}
             </div>
@@ -208,13 +304,14 @@ export default function VerifyPage() {
               value={personalData.bio}
               onChange={(e) => setPersonalData({ ...personalData, bio: e.target.value })}
               className="w-full px-4 py-3 rounded-lg bg-background border border-card-border focus:border-accent outline-none resize-none h-24"
+              disabled={isLoading}
             />
           </div>
           <div className="flex gap-3">
             <button onClick={handlePersonalSubmit} disabled={isLoading} className="btn-primary flex-1 disabled:opacity-50">
               {isLoading ? "Saving..." : "Save & Continue"}
             </button>
-            <button onClick={() => setStep("social")} className="px-4 py-3 rounded-lg border border-card-border text-muted hover:text-foreground transition-colors">
+            <button onClick={() => setStep("social")} disabled={isLoading} className="px-4 py-3 rounded-lg border border-card-border text-muted hover:text-foreground transition-colors">
               Skip
             </button>
           </div>
@@ -260,10 +357,10 @@ export default function VerifyPage() {
             )}
           </div>
           <div className="flex gap-3">
-            <button onClick={() => setStep("wallets")} className="btn-primary flex-1">
+            <button onClick={() => setStep("wallets")} disabled={isLoading} className="btn-primary flex-1">
               Next Step
             </button>
-            <button onClick={() => setStep("wallets")} className="px-4 py-3 rounded-lg border border-card-border text-muted hover:text-foreground transition-colors">
+            <button onClick={() => setStep("wallets")} disabled={isLoading} className="px-4 py-3 rounded-lg border border-card-border text-muted hover:text-foreground transition-colors">
               Skip
             </button>
           </div>
@@ -282,6 +379,7 @@ export default function VerifyPage() {
                 value={extraWallets.evm}
                 onChange={(e) => { setExtraWallets({ ...extraWallets, evm: e.target.value }); setWalletErrors({ ...walletErrors, evm: undefined }); }}
                 className={`w-full px-4 py-3 rounded-lg bg-background border ${walletErrors.evm ? "border-red-500" : "border-card-border"} focus:border-accent outline-none font-mono text-sm`}
+                disabled={isLoading}
               />
               {walletErrors.evm && <p className="text-red-400 text-xs mt-1">{walletErrors.evm}</p>}
             </div>
@@ -292,6 +390,7 @@ export default function VerifyPage() {
                 value={extraWallets.solana}
                 onChange={(e) => { setExtraWallets({ ...extraWallets, solana: e.target.value }); setWalletErrors({ ...walletErrors, solana: undefined }); }}
                 className={`w-full px-4 py-3 rounded-lg bg-background border ${walletErrors.solana ? "border-red-500" : "border-card-border"} focus:border-accent outline-none font-mono text-sm`}
+                disabled={isLoading}
               />
               {walletErrors.solana && <p className="text-red-400 text-xs mt-1">{walletErrors.solana}</p>}
             </div>
@@ -302,6 +401,7 @@ export default function VerifyPage() {
                 value={extraWallets.btc}
                 onChange={(e) => { setExtraWallets({ ...extraWallets, btc: e.target.value }); setWalletErrors({ ...walletErrors, btc: undefined }); }}
                 className={`w-full px-4 py-3 rounded-lg bg-background border ${walletErrors.btc ? "border-red-500" : "border-card-border"} focus:border-accent outline-none font-mono text-sm`}
+                disabled={isLoading}
               />
               {walletErrors.btc && <p className="text-red-400 text-xs mt-1">{walletErrors.btc}</p>}
             </div>
@@ -310,7 +410,7 @@ export default function VerifyPage() {
             <button onClick={handleExtraWallets} disabled={isLoading} className="btn-primary flex-1 disabled:opacity-50">
               {isLoading ? "Saving..." : "Save & Finish"}
             </button>
-            <button onClick={() => { refetchIdentity(); setStep("complete"); }} className="px-4 py-3 rounded-lg border border-card-border text-muted hover:text-foreground transition-colors">
+            <button onClick={() => { refetchIdentity(); setStep("complete"); }} disabled={isLoading} className="px-4 py-3 rounded-lg border border-card-border text-muted hover:text-foreground transition-colors">
               Skip
             </button>
           </div>

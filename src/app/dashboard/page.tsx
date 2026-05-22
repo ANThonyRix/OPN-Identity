@@ -12,17 +12,18 @@ import Link from "next/link";
 export default function DashboardPage() {
   const { address, isConnected } = useAccount();
   const { isVerified, score, credentialKeys } = useIdentity(address);
-  const { updateCredential, isPending, isConfirming } = useUpdateCredential();
-  const { setSocial, isPending: isSocialPending, isConfirming: isSocialConfirming } = useSetSocial();
+  const { updateCredential, isPending } = useUpdateCredential();
+  const { setSocial, isPending: isSocialPending } = useSetSocial();
   const { data: session } = useSession();
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<UserCredentialData>({});
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
+  const [isSaving, setIsSaving] = useState(false);
   const [savedData, setSavedData] = useState<UserCredentialData>(() =>
     address ? getCredentialData(address) : {}
   );
 
-  const isLoading = isPending || isConfirming || isSocialPending || isSocialConfirming;
+  const isLoading = isPending || isSocialPending || isSaving;
 
   // Handle OAuth callback for re-linking socials
   useEffect(() => {
@@ -32,11 +33,18 @@ export default function DashboardPage() {
 
       if (provider && username && (provider === "twitter" || provider === "discord")) {
         const handle = provider === "twitter" ? username.toLowerCase() : username;
-        updateCredential(provider, `${address}:${provider}:${handle}`);
-        setSocial(provider, handle);
-        saveCredentialData(address, { [provider]: handle });
-        setSavedData((prev) => ({ ...prev, [provider]: handle }));
-        signOut({ redirect: false });
+        (async () => {
+          setIsSaving(true);
+          try {
+            await updateCredential(provider, `${address}:${provider}:${handle}`);
+            await setSocial(provider, handle);
+            saveCredentialData(address, { [provider]: handle });
+            setSavedData((prev) => ({ ...prev, [provider]: handle }));
+            signOut({ redirect: false });
+          } finally {
+            setIsSaving(false);
+          }
+        })();
       }
     }
   }, [session, address]);
@@ -65,31 +73,34 @@ export default function DashboardPage() {
     return errors;
   };
 
-  const saveEdits = () => {
+  const saveEdits = async () => {
     const errors = validateEditData();
     setEditErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
     if (!address) return;
 
-    // Send on-chain transactions for changed credentials (exclude OAuth-verified socials)
-    const keys = credentialKeys as string[];
-    keys.forEach((key) => {
-      if (key === "wallet" || key === "twitter" || key === "discord") return;
-      const newValue = editData[key as keyof UserCredentialData]?.trim();
-      const oldValue = savedData[key as keyof UserCredentialData]?.trim();
-      if (newValue && newValue !== oldValue) {
-        updateCredential(key, `${address}:${key}:${newValue}`);
-        if (key === "email") {
-          setSocial("email", newValue.toLowerCase());
+    setIsSaving(true);
+    try {
+      const keys = credentialKeys as string[];
+      for (const key of keys) {
+        if (key === "wallet" || key === "twitter" || key === "discord") continue;
+        const newValue = editData[key as keyof UserCredentialData]?.trim();
+        const oldValue = savedData[key as keyof UserCredentialData]?.trim();
+        if (newValue && newValue !== oldValue) {
+          await updateCredential(key, `${address}:${key}:${newValue}`);
+          if (key === "email") {
+            await setSocial("email", newValue.toLowerCase());
+          }
         }
       }
-    });
 
-    // Save to localStorage
-    saveCredentialData(address, editData);
-    setSavedData({ ...savedData, ...editData });
-    setIsEditing(false);
+      saveCredentialData(address, editData);
+      setSavedData({ ...savedData, ...editData });
+      setIsEditing(false);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!isConnected) {
