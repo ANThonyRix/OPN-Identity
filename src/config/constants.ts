@@ -1,4 +1,4 @@
-export const IDENTITY_SBT_ADDRESS = process.env.NEXT_PUBLIC_SBT_CONTRACT || "0xdB8252B88f2D8914fE5Ff4e37e07365663EFc913";
+export const IDENTITY_SBT_ADDRESS = process.env.NEXT_PUBLIC_SBT_CONTRACT || "0x5e61fec0E2193e2e57D822c940ffC2Ce79b8F2f3";
 
 export const VERIFICATION_SCORES: Record<string, number> = {
   wallet: 10,
