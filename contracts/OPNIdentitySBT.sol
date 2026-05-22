@@ -186,7 +186,7 @@ contract OPNIdentitySBT is ERC721 {
 
     function addCredentials(string[] calldata credentialTypes, bytes32[] calldata credentialHashes) external onlyHolder {
         require(credentialTypes.length == credentialHashes.length, "Length mismatch");
-        require(credentialTypes.length > 0, "Empty arrays");
+        require(credentialTypes.length > 0 && credentialTypes.length <= 10, "Invalid array length");
 
         uint16 totalPoints = uint16(_identities[msg.sender].score);
 
