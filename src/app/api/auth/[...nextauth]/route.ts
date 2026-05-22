@@ -19,7 +19,10 @@ const handler = NextAuth({
       if (account) {
         token.provider = account.provider;
         token.providerAccountId = account.providerAccountId;
-        token.username = (profile as { username?: string })?.username || (profile as { name?: string })?.name;
+        // Twitter v2 nests profile under `data`, Discord has it at top level
+        const twitterUsername = (profile as any)?.data?.username;
+        const fallbackUsername = (profile as { username?: string })?.username || (profile as { name?: string })?.name;
+        token.username = twitterUsername || fallbackUsername;
       }
       return token;
     },
