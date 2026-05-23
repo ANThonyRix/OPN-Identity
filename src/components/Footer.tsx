@@ -42,7 +42,7 @@ export function Footer() {
             Faucet
           </a>
           <a
-            href="https://x.com/Pay_LitVM"
+            href="https://x.com/IOPn_io"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 text-sm text-muted hover:text-foreground transition-colors"
