@@ -5,7 +5,7 @@ import Link from "next/link";
 export function Footer() {
   return (
     <footer className="w-full border-t border-card-border bg-card/50 backdrop-blur-sm">
-      <div className="max-w-6xl mx-auto px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="max-w-6xl mx-auto px-4 py-6 flex flex-col-reverse sm:flex-row items-center justify-between gap-4">
         <p className="text-sm text-muted">&copy; 2026 OPN Identity - OPN Chain Testnet</p>
         <div className="flex items-center gap-4 flex-wrap justify-center">
           <a
