@@ -51,7 +51,7 @@ const faqItems = [
   {
     question: "How do other dApps verify my identity?",
     answer:
-      "Any dApp on OPN Chain can check your Trust Score with a single contract call. All read functions are free (no gas required).\n\nAvailable functions:\n\n• isVerified(address) → bool — check if address has an identity\n• getScore(address) → uint8 — get Trust Score (0-100)\n• getIdentity(address) → (score, issuedAt, updatedAt, dataHash) — full identity info\n• getCredentialKeys(address) → string[] — list of verified credential types\n• getCredential(address, type) → bytes32 — hash of a specific credential\n• getSocialHash(address, platformHash) → bytes32 — hash of linked social handle\n• getAddressByHandle(platformHash, handleHash) → address — reverse lookup by social handle\n\nSolidity integration example:\n\ninterface IOPNIdentity {\n    function isVerified(address) external view returns (bool);\n    function getScore(address) external view returns (uint8);\n}\n\ncontract MyDApp {\n    IOPNIdentity identity = IOPNIdentity(0x5e61fec0E2193e2e57D822c940ffC2Ce79b8F2f3);\n\n    function claimAirdrop() external {\n        require(identity.isVerified(msg.sender), \"Not verified\");\n        require(identity.getScore(msg.sender) >= 50, \"Score too low\");\n        // ... distribute tokens\n    }\n}\n\nFrontend integration (viem/wagmi):\n\nconst score = await publicClient.readContract({\n  address: '0x5e61fec0E2193e2e57D822c940ffC2Ce79b8F2f3',\n  abi: identityAbi,\n  functionName: 'getScore',\n  args: [userAddress],\n});\n\nUse cases:\n• Airdrops — distribute only to verified users (anti-sybil)\n• Governance — voting weight based on Trust Score\n• DeFi — loan limits tied to score\n• Marketplace — 'Verified' badge for sellers\n• Gated access — features unlocked at score >= N",
+      "Any dApp on OPN Chain can check your Trust Score with a single contract call. All read functions are free (no gas required).\n\nAvailable functions:\n\n• isVerified(address) → bool — check if address has an identity\n• getScore(address) → uint8 — get Trust Score (0-100)\n• getIdentity(address) → (score, issuedAt, updatedAt, dataHash) — full identity info\n• getCredentialKeys(address) → string[] — list of verified credential types\n• getCredential(address, type) → bytes32 — hash of a specific credential\n• getSocialHash(address, platformHash) → bytes32 — hash of linked social handle\n• getAddressByHandle(platformHash, handleHash) → address — reverse lookup by social handle\n\nSolidity integration example:\n\ninterface IOPNIdentity {\n    function isVerified(address) external view returns (bool);\n    function getScore(address) external view returns (uint8);\n}\n\ncontract MyDApp {\n    IOPNIdentity identity = IOPNIdentity(0x77F38e4e8D4C45a1C1AD0780b273b35AFE084666);\n\n    function claimAirdrop() external {\n        require(identity.isVerified(msg.sender), \"Not verified\");\n        require(identity.getScore(msg.sender) >= 50, \"Score too low\");\n        // ... distribute tokens\n    }\n}\n\nFrontend integration (viem/wagmi):\n\nconst score = await publicClient.readContract({\n  address: '0x77F38e4e8D4C45a1C1AD0780b273b35AFE084666',\n  abi: identityAbi,\n  functionName: 'getScore',\n  args: [userAddress],\n});\n\nUse cases:\n• Airdrops — distribute only to verified users (anti-sybil)\n• Governance — voting weight based on Trust Score\n• DeFi — loan limits tied to score\n• Marketplace — 'Verified' badge for sellers\n• Gated access — features unlocked at score >= N",
   },
   {
     question: "Is my personal data stored on the blockchain?",
@@ -99,12 +99,12 @@ export default function FAQPage() {
       <div className="card text-center space-y-2">
         <h3 className="text-sm text-muted">Smart Contract Address</h3>
         <a
-          href="https://testnet.iopn.tech/address/0x5e61fec0E2193e2e57D822c940ffC2Ce79b8F2f3"
+          href="https://testnet.iopn.tech/address/0x77F38e4e8D4C45a1C1AD0780b273b35AFE084666"
           target="_blank"
           rel="noopener noreferrer"
           className="text-accent hover:text-accent-hover font-mono text-sm sm:text-base break-all"
         >
-          0x5e61fec0E2193e2e57D822c940ffC2Ce79b8F2f3
+          0x77F38e4e8D4C45a1C1AD0780b273b35AFE084666
         </a>
         <p className="text-xs text-muted">OPN Chain Testnet (Chain ID: 984)</p>
       </div>
