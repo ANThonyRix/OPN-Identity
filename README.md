@@ -61,7 +61,7 @@ Open http://localhost:3000
 
 ## Contract API (for dApp developers)
 
-```solidity
+``solidity
 // Check if address is verified
 function isVerified(address account) → bool
 
